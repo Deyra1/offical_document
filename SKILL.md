@@ -247,7 +247,9 @@ doc.add_page_break()
 
 **标题段落必须使用 `doc.add_paragraph(style='Heading N')` 创建**，而不是普通段落。原因：只有使用 Word 内置 Heading 样式，才能在 Word 中通过"引用 → 目录"自动生成目录。
 
-设置 Heading 样式后，仍然需要手动覆盖字体、字号、行距、缩进等属性（因为 Word 默认的 Heading 样式格式不符合公文规范）。
+设置 Heading 样式后，仍然需要手动覆盖字体、字号、行距、缩进、**颜色**等属性（因为 Word 默认的 Heading 样式是蓝色字体，不符合公文规范）。
+
+**必须显式设置 `run.font.color.rgb = RGBColor(0, 0, 0)`**，否则标题会继承 Heading 样式的蓝色。`run.font.color.rgb = None` 表示"不设置"（继承样式颜色），不等于黑色。
 
 **关键区别**：
 - 一级标题用 **黑体(SimHei) + 加粗**，顶格
@@ -391,7 +393,7 @@ sc(table.rows[1].cells[2], '描述文字...')
 
 ```python
 from docx import Document
-from docx.shared import Pt, Mm, Cm
+from docx.shared import Pt, Mm, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH as WDA
 from docx.oxml.ns import qn
 
@@ -425,7 +427,7 @@ def ap(doc, text, fn=FONT_BODY, sz=PT_BODY, b=False, al=WDA.JUSTIFY, ind=True, s
     run._element.rPr.rFonts.set(qn('w:eastAsia'), fn)
     run.font.size = sz
     run.font.bold = b
-    run.font.color.rgb = None  # 确保黑色，不受 Heading 样式影响
+    run.font.color.rgb = RGBColor(0, 0, 0)  # Heading 样式默认蓝色，必须显式设为黑色
     return p
 
 
