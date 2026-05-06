@@ -46,10 +46,13 @@ cp "$SKILL_FONTS/方正小标宋简.TTF" ~/Library/Fonts/ 2>/dev/null
 |---------|---------|----------------------|
 | 正文 | 仿宋_GB2312.ttf | `FangSong_GB2312` |
 | 文档大标题 | 方正小标宋简.TTF | `FZXiaoBiaoSong-B05S` |
-| 一级标题（黑体） | 系统自带 | `STHeiti` |
-| 页码（宋体） | 系统自带 | `Songti SC` |
+| 一级标题（黑体） | 系统/Windows 自带 | `SimHei` |
+| 二级标题（楷体） | 系统/Windows 自带 | `KaiTi` |
+| 页码（宋体） | 系统自带 | `SimSun` |
 
 **注意**：macOS 没有 `fc-list` 命令，不要使用。检查字体是否安装直接 `ls ~/Library/Fonts/` 即可。
+
+**关于字体名选择**：python-docx 中写入的字体名是 Word 文档的声明，不要求本机安装该字体。应使用 Windows 标准字体名（`SimHei`、`KaiTi`、`SimSun`），而非 macOS 特有字体名（如 `STHeiti`、`STKaiti`、`Songti SC`），因为最终文档是交给对方在 Windows 环境查看。
 
 ### python-docx 固定参数速查表
 
@@ -107,6 +110,20 @@ run.font.size = Pt(16)
 
 如果源文档中的引号是 ASCII `"`，转换时要替换为全角 `\u201c \u201d`。
 
+### 中文字符串禁止用 Unicode 转义
+
+**直接写中文字符**，不要将中文内容用 `\uXXXX` 形式编码。原因：容易写错码点（如"疯"写成"疌"），且不可读、不可审查。
+
+```python
+# ✅ 正确
+title = '疯狂派对游戏产品说明'
+
+# ❌ 错误 - 容易写错且不可读
+title = '\u75af\u72c2\u6d3e\u5bf9...'
+```
+
+仅引号等特殊字符允许使用 Unicode 转义（因为它们与 Python 字符串语法冲突）。
+
 ## 操作流程
 
 1. **确认依赖可用**：`python3 -c "import docx"` 
@@ -130,10 +147,10 @@ run.font.size = Pt(16)
 |------|------|-------------------|------|
 | 正文 | 仿宋 | `FangSong_GB2312` | 三号(16pt) |
 | 文档标题 | 方正小标宋 | `FZXiaoBiaoSong-B05S` | 二号(22pt) |
-| 一级标题（一、） | 黑体 | `STHeiti` | 三号(16pt) |
-| 二级标题（1.1） | 楷体/仿宋 | `FangSong_GB2312` | 三号(16pt) |
+| 一级标题（一、） | 黑体 | `SimHei` | 三号(16pt) |
+| 二级标题（1.1） | 楷体 | `KaiTi` | 三号(16pt) |
 | 三/四级标题 | 仿宋 | `FangSong_GB2312` | 三号(16pt) |
-| 页码 | 宋体 | `Songti SC` | 四号(14pt) |
+| 页码 | 宋体 | `SimSun` | 四号(14pt) |
 
 ### 正文编排
 
@@ -144,8 +161,8 @@ run.font.size = Pt(16)
 
 ### 结构层次序数
 
-- 第一层：`一、` `二、` `三、`（黑体）
-- 第二层：`（一）` `（二）`（楷体）或 `1.1` `1.2`（产品说明常用）
+- 第一层：`一、` `二、` `三、`（黑体 SimHei）
+- 第二层：`（一）` `（二）`（楷体 KaiTi）或 `1.1` `1.2`（产品说明常用）
 - 第三层：`1.` `2.` `3.`（仿宋）
 - 第四层：`（1）` `（2）` `（3）`（仿宋）
 
@@ -204,13 +221,169 @@ doc.add_page_break()
    - `.doc` → `textutil -convert txt -stdout file.doc`
    - `.txt/.md` → 直接读取
 2. **识别结构**：自动识别标题、正文段落、层级序号、表格
-3. **格式映射**：
-   - 源标题 → 二号黑体居中
-   - 源正文 → 三号仿宋(Songti SC)，首行缩进
+3. **提取图片**：从源 .docx 中提取所有图片，在新文档中按原位置插入
+4. **格式映射**：
+   - 源标题 → 按层级设置对应格式（见下方标题层级规则）
+   - 源正文 → 三号仿宋(FangSong_GB2312)，首行缩进
    - 源序号列表 → 按层次序数规范重排
-   - 源表格 → 保留内容，字体统一为仿宋
+   - 源表格 → 保留内容，按公文表格规范重排
    - 源文中 ASCII `"` 引号 → 替换为 `\u201c \u201d` 全角引号
-4. **输出新文档**：`原文件名_公文格式.docx`，不修改源文件
+   - 源图片 → 保持原始尺寸，居中排布，图片前后各保留一个空段落
+5. **输出新文档**：`原文件名_公文格式.docx`，不修改源文件
+
+## 标题层级规则（必须严格遵守）
+
+各级标题必须有明确的视觉层级区分：
+
+| 层级 | 格式示例 | 字体 | 字号 | 加粗 | 缩进 | Word 样式 |
+|------|---------|------|------|------|------|----------|
+| 文档大标题 | 疯狂派对游戏产品说明 | FZXiaoBiaoSong-B05S | 二号(22pt) | 是 | 居中，无缩进 | 正文/无 |
+| 一级标题 | 一、背景与设定 | SimHei | 三号(16pt) | 是 | 顶格（无缩进） | Heading 1 |
+| 二级标题 | 1.1  游戏背景 | KaiTi | 三号(16pt) | 是 | 首行缩进2字符 | Heading 2 |
+| 三级标题 | 1.1.1  好人阵营 | FangSong_GB2312 | 三号(16pt) | 是 | 首行缩进2字符 | Heading 3 |
+| 正文 | 普通段落文字 | FangSong_GB2312 | 三号(16pt) | 否 | 首行缩进2字符 | 正文 |
+
+### 必须设置 Word 内置 Heading 样式
+
+**标题段落必须使用 `doc.add_paragraph(style='Heading N')` 创建**，而不是普通段落。原因：只有使用 Word 内置 Heading 样式，才能在 Word 中通过"引用 → 目录"自动生成目录。
+
+设置 Heading 样式后，仍然需要手动覆盖字体、字号、行距、缩进等属性（因为 Word 默认的 Heading 样式格式不符合公文规范）。
+
+**关键区别**：
+- 一级标题用 **黑体(SimHei) + 加粗**，顶格
+- 二级标题用 **楷体(KaiTi) + 加粗**，首行缩进
+- 三级标题用 **仿宋加粗**，与正文区分仅靠加粗
+- 正文用 **仿宋不加粗**
+
+## 图片处理规则
+
+转换文档时，**必须保留原文档中的所有图片**：
+
+1. **提取图片**：从源 .docx 的 `word/media/` 中提取所有图片文件
+2. **插入位置**：按原文档中图片出现的段落位置，在对应文字之后插入
+3. **注意空表格中的图片**：原文档可能使用空表格来并排展示图片，解析时必须检查表格元素中的 `a:blip` 引用，将其中的图片也提取并按顺序插入
+4. **图片格式**：
+   - 居中对齐
+   - 保持原始宽高比
+   - 宽度不超过版心宽度（156mm），超出则等比缩小
+   - 图片段落无首行缩进
+4. **python-docx 插入图片代码**：
+
+```python
+from docx.shared import Mm
+from docx.enum.text import WD_ALIGN_PARAGRAPH as WDA
+
+def add_image(doc, image_path, max_width_mm=150):
+    """插入图片，居中，限制最大宽度"""
+    from PIL import Image
+    img = Image.open(image_path)
+    w, h = img.size
+    # 按最大宽度等比缩放
+    width = Mm(max_width_mm)
+    
+    p = doc.add_paragraph()
+    p.alignment = WDA.CENTER
+    p.paragraph_format.first_line_indent = None
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after = Pt(6)
+    run = p.add_run()
+    run.add_picture(image_path, width=width)
+    return p
+```
+
+5. **如果无法安装 PIL/Pillow**，直接设置固定宽度 `Mm(150)` 即可
+
+## 表格格式规范
+
+公文中的表格样式要求：
+
+1. **边框**：单线边框（`single`），线宽 4-6（约 0.5pt），颜色黑色
+2. **表头**：
+   - 字体：仿宋(FangSong_GB2312)，加粗
+   - 对齐：水平居中 + 垂直居中
+   - 无底色（公文表格不加灰色底纹）
+3. **正文单元格**：
+   - 字体：仿宋(FangSong_GB2312)，不加粗
+   - 对齐：水平居中 + 垂直居中
+4. **表格宽度**：撑满版心宽度
+5. **行距**：单倍行距（不同于正文的固定行距28.95磅）
+6. **单元格内边距**：上下 60 twips，左右 108 twips
+
+**python-docx 表格代码模板**：
+
+```python
+from docx.oxml.ns import qn, nsdecls
+from docx.oxml import parse_xml
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+
+def set_table_border(table):
+    """设置表格为公文标准单线边框"""
+    tbl = table._tbl
+    tblPr = tbl.find(qn('w:tblPr'))
+    if tblPr is None:
+        tblPr = parse_xml(f'<w:tblPr {nsdecls("w")}></w:tblPr>')
+        tbl.insert(0, tblPr)
+    borders = parse_xml(
+        f'<w:tblBorders {nsdecls("w")}>'
+        '<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>'
+        '</w:tblBorders>'
+    )
+    tblPr.append(borders)
+
+
+def sc(cell, text, fn=FONT_BODY, sz=PT_BODY, b=False):
+    """设置表格单元格：水平居中 + 垂直居中 + 单倍行距"""
+    from docx.oxml import OxmlElement
+    # 必须清空并重建段落，否则 run 属性可能不生效
+    for p in cell.paragraphs:
+        p._element.getparent().remove(p._element)
+    new_p = OxmlElement('w:p')
+    cell._tc.append(new_p)
+    from docx.text.paragraph import Paragraph
+    p = Paragraph(new_p, cell)
+    
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    p.alignment = WDA.CENTER
+    p.paragraph_format.line_spacing = None  # 单倍行距
+    p.paragraph_format.first_line_indent = None
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+    
+    run = p.add_run(text)
+    run.font.name = fn
+    rPr = run._element.get_or_add_rPr()
+    rFonts = OxmlElement('w:rFonts')
+    rFonts.set(qn('w:eastAsia'), fn)
+    rFonts.set(qn('w:ascii'), fn)
+    rFonts.set(qn('w:hAnsi'), fn)
+    rPr.append(rFonts)
+    run.font.size = sz
+    run.font.bold = b
+
+
+# 使用示例
+table = doc.add_table(rows=6, cols=3)
+set_table_border(table)
+
+# 设置表头（加粗）
+for i, text in enumerate(['角色名称', '主动技能', '角色设定与胜利条件']):
+    sc(table.rows[0].cells[i], text, b=True)
+
+# 设置数据行（不加粗）
+sc(table.rows[1].cells[0], '魔术师')
+sc(table.rows[1].cells[2], '描述文字...')
+```
+
+**表格禁止事项**：
+- ❌ 不要加灰色底纹/背景色（ShadingType）
+- ❌ 不要用粗边框（sz 不超过 6）
+- ❌ 不要用彩色边框
+- ❌ 不要用固定行距28.95磅（表格内用单倍行距）
 
 ## python-docx 代码模板
 
@@ -223,9 +396,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH as WDA
 from docx.oxml.ns import qn
 
 FONT_BODY = 'FangSong_GB2312'
-FONT_HEITI = 'STHeiti'
+FONT_HEITI = 'SimHei'
+FONT_KAITI = 'KaiTi'
 FONT_TITLE = 'FZXiaoBiaoSong-B05S'
-FONT_SONG = 'Songti SC'
+FONT_SONG = 'SimSun'
 PT_BODY = Pt(16)
 PT_TITLE = Pt(22)
 PT_COVER = Pt(24)
@@ -233,9 +407,9 @@ LINE_SP = Pt(28.95)
 INDENT = Cm(0.85)
 
 
-def ap(doc, text, fn=FONT_BODY, sz=PT_BODY, b=False, al=WDA.JUSTIFY, ind=True):
+def ap(doc, text, fn=FONT_BODY, sz=PT_BODY, b=False, al=WDA.JUSTIFY, ind=True, style=None):
     """添加一个段落"""
-    p = doc.add_paragraph()
+    p = doc.add_paragraph(style=style) if style else doc.add_paragraph()
     p.alignment = al
     pf = p.paragraph_format
     pf.line_spacing = LINE_SP
@@ -244,29 +418,42 @@ def ap(doc, text, fn=FONT_BODY, sz=PT_BODY, b=False, al=WDA.JUSTIFY, ind=True):
     pf.space_after = Pt(0)
     if ind:
         pf.first_line_indent = INDENT
+    else:
+        pf.first_line_indent = None
     run = p.add_run(text)
     run.font.name = fn
     run._element.rPr.rFonts.set(qn('w:eastAsia'), fn)
     run.font.size = sz
     run.font.bold = b
+    run.font.color.rgb = None  # 确保黑色，不受 Heading 样式影响
     return p
 
 
-def h1(d, t): return ap(d, t, fn=FONT_HEITI, b=True, ind=False)
-def h2(d, t): return ap(d, t, ind=True)
-def h3(d, t): return ap(d, t, ind=True)
-def bd(d, t, b=False): return ap(d, t, b=b, ind=True)
-def em(d): return ap(d, '', ind=False)
+def h1(d, t): return ap(d, t, fn=FONT_HEITI, b=True, ind=False, style='Heading 1')   # 一、顶格黑体加粗
+def h2(d, t): return ap(d, t, fn=FONT_KAITI, b=True, ind=True, style='Heading 2')   # 1.1 缩进楷体加粗
+def h3(d, t): return ap(d, t, fn=FONT_BODY, b=True, ind=True, style='Heading 3')    # 1.1.1 缩进仿宋加粗
+def bd(d, t, b=False): return ap(d, t, b=b, ind=True)                  # 正文
+def em(d): return ap(d, '', ind=False)                                  # 空行
 
 
-def sc(cell, text, fn=FONT_BODY, sz=PT_BODY, b=False, al=WDA.LEFT):
-    """设置表格单元格"""
-    cell.text = ''
-    p = cell.paragraphs[0]
+def sc(cell, text, fn=FONT_BODY, sz=PT_BODY, b=False, al=WDA.CENTER):
+    """设置表格单元格（正确写法：重建段落确保 run 属性生效）"""
+    from docx.oxml import OxmlElement
+    from docx.text.paragraph import Paragraph
+    for p in cell.paragraphs:
+        p._element.getparent().remove(p._element)
+    new_p = OxmlElement('w:p')
+    cell._tc.append(new_p)
+    p = Paragraph(new_p, cell)
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     p.alignment = al
     run = p.add_run(text)
     run.font.name = fn
-    run._element.rPr.rFonts.set(qn('w:eastAsia'), fn)
+    rPr = run._element.get_or_add_rPr()
+    rFonts = OxmlElement('w:rFonts')
+    rFonts.set(qn('w:eastAsia'), fn)
+    rFonts.set(qn('w:ascii'), fn)
+    rPr.append(rFonts)
     run.font.size = sz
     run.font.bold = b
 
@@ -312,3 +499,12 @@ doc.save('/path/to/output.docx')
 - 正文：三号仿宋(FangSong_GB2312)，首行缩进，固定行距28.95磅
 - 结构层次：一、→ 1.1 → 1.1.1（产品说明常用数字序号）
 - 页码：`— 1 —` 格式，封面不计
+
+## 转换时必须检查的事项
+
+1. **图片是否保留** — 必须从源文档提取所有图片（包括空表格中的并排图片）并插入新文档
+2. **标题层级是否区分** — 一级标题用 SimHei（黑体），二级标题用 KaiTi（楷体），三级标题用仿宋加粗，正文仿宋不加粗
+3. **标题是否设置 Heading 样式** — 必须用 Heading 1/2/3 样式，否则无法自动生成目录
+4. **表格是否规范** — 单线细边框、无底色、表头加粗居中、单倍行距
+5. **字体名是否正确** — 使用 Windows 标准字体名（SimHei/KaiTi/SimSun），不要用 macOS 字体名（STHeiti/STKaiti/Songti SC）
+6. **中文内容是否直接写** — 中文字符串直接写中文，不要用 `\uXXXX` 转义（仅引号等特殊字符例外）
