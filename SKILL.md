@@ -265,35 +265,33 @@ doc.add_page_break()
 2. **插入位置**：按原文档中图片出现的段落位置，在对应文字之后插入
 3. **注意空表格中的图片**：原文档可能使用空表格来并排展示图片，解析时必须检查表格元素中的 `a:blip` 引用，将其中的图片也提取并按顺序插入
 4. **图片格式**：
+   - **嵌入式**（inline）— python-docx 的 `run.add_picture()` 默认即为嵌入式，不要设置浮动
    - 居中对齐
    - 保持原始宽高比
    - 宽度不超过版心宽度（156mm），超出则等比缩小
    - 图片段落无首行缩进
-4. **python-docx 插入图片代码**：
+   - **图片所在段落使用单倍行距**（不是正文的固定28.95磅），否则图片会被裁切
+5. **python-docx 插入图片代码**：
 
 ```python
-from docx.shared import Mm
+from docx.shared import Mm, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH as WDA
 
 def add_image(doc, image_path, max_width_mm=150):
-    """插入图片，居中，限制最大宽度"""
-    from PIL import Image
-    img = Image.open(image_path)
-    w, h = img.size
-    # 按最大宽度等比缩放
-    width = Mm(max_width_mm)
-    
+    """插入嵌入式图片，居中，单倍行距，限制最大宽度"""
     p = doc.add_paragraph()
     p.alignment = WDA.CENTER
-    p.paragraph_format.first_line_indent = None
-    p.paragraph_format.space_before = Pt(6)
-    p.paragraph_format.space_after = Pt(6)
+    pf = p.paragraph_format
+    pf.first_line_indent = None
+    pf.line_spacing = None   # 单倍行距（图片段落必须，否则固定行距会裁切图片）
+    pf.space_before = Pt(6)
+    pf.space_after = Pt(6)
     run = p.add_run()
-    run.add_picture(image_path, width=width)
+    run.add_picture(image_path, width=Mm(max_width_mm))
     return p
 ```
 
-5. **如果无法安装 PIL/Pillow**，直接设置固定宽度 `Mm(150)` 即可
+6. **如果无法安装 PIL/Pillow**，直接设置固定宽度 `Mm(150)` 即可
 
 ## 表格格式规范
 
