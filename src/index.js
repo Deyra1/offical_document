@@ -62,9 +62,7 @@ const MARGIN = {
 /** 字号对照表 (单位: half-point, 即 Word 中的字号×2) */
 const FONT_SIZE = {
   "小标宋_2号": 44,  // 2号 = 22pt → 44 half-points
-  "黑体_3号": 32,    // 3号 = 16pt → 32 half-points
-  "楷体_3号": 32,
-  "仿宋_3号": 32,
+  "3号": 32,         // 3号 = 16pt → 32 half-points
   "仿宋_4号": 28,    // 4号 = 14pt → 28 half-points
   "宋体_4号半角": 28,
 };
@@ -187,7 +185,7 @@ class OfficialDocumentBuilder {
           new TextRun({
             text: text,
             font: { eastAsia: FONT.heiti },
-            size: FONT_SIZE["黑体_3号"],
+            size: FONT_SIZE["3号"],
             bold: true,
           }),
         ],
@@ -197,7 +195,7 @@ class OfficialDocumentBuilder {
   }
 
   /**
-   * 添加二级标题 - 格式: 1.1 标题内容（3号楷体）
+   * 添加二级标题 - 格式: 1.1 标题内容（楷体小三）
    */
   addHeading2(title) {
     const text = this.numbering.nextH2(title);
@@ -209,7 +207,7 @@ class OfficialDocumentBuilder {
           new TextRun({
             text: text,
             font: { eastAsia: FONT.kaiti },
-            size: FONT_SIZE["楷体_3号"],
+            size: FONT_SIZE["3号"],
           }),
         ],
       })
@@ -218,7 +216,7 @@ class OfficialDocumentBuilder {
   }
 
   /**
-   * 添加三级标题 - 格式: 1.1.1 标题内容（3号仿宋体）
+   * 添加三级标题 - 格式: 1.1.1 标题内容（仿宋体四号）
    */
   addHeading3(title) {
     const text = this.numbering.nextH3(title);
@@ -230,7 +228,7 @@ class OfficialDocumentBuilder {
           new TextRun({
             text: text,
             font: { eastAsia: FONT.fangsong },
-            size: FONT_SIZE["仿宋_3号"],
+            size: FONT_SIZE["3号"],
           }),
         ],
       })
@@ -251,7 +249,7 @@ class OfficialDocumentBuilder {
           new TextRun({
             text: text,
             font: { eastAsia: FONT.fangsong },
-            size: FONT_SIZE["仿宋_3号"],
+            size: FONT_SIZE["3号"],
           }),
         ],
       })
@@ -271,7 +269,7 @@ class OfficialDocumentBuilder {
           new TextRun({
             text: text,
             font: { eastAsia: FONT.fangsong },
-            size: FONT_SIZE["仿宋_3号"],
+            size: FONT_SIZE["3号"],
           }),
         ],
       })
@@ -291,7 +289,7 @@ class OfficialDocumentBuilder {
           new TextRun({
             text: recipient + "：",
             font: { eastAsia: FONT.fangsong },
-            size: FONT_SIZE["仿宋_3号"],
+            size: FONT_SIZE["3号"],
           }),
         ],
       })
@@ -332,7 +330,7 @@ class OfficialDocumentBuilder {
           document: {
             run: {
               font: { eastAsia: FONT.fangsong },
-              size: FONT_SIZE["仿宋_3号"],
+              size: FONT_SIZE["3号"],
             },
           },
         },

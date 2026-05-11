@@ -4,6 +4,7 @@
   "description": "党政机关公文格式文档生成工具，遵循 GB/T 9704-2012 标准",
   "main": "src/index.js",
   "scripts": {
+    "start": "node preview-server.js",
     "example": "node examples/generate-example.js",
     "test": "node test/test.js"
   },

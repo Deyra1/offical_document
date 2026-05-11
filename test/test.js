@@ -5,6 +5,11 @@
 import { createDocument, OfficialDocumentBuilder, NumberingManager } from "../src/index.js";
 import fs from "fs";
 import assert from "assert";
+import http from "http";
+import net from "net";
+import path from "path";
+import { fileURLToPath } from "url";
+import { spawn } from "child_process";
 
 // ============================================================
 // 测试 NumberingManager
@@ -109,6 +114,121 @@ async function testCreateDocument() {
   console.log("✓ createDocument 快捷函数测试通过");
 }
 
+async function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const tester = net.createServer();
+    tester.listen(0, "127.0.0.1", () => {
+      const address = tester.address();
+      tester.close(() => resolve(address.port));
+    });
+    tester.on("error", reject);
+  });
+}
+
+async function request({ port, method, path: requestPath, body, headers = {} }) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: "127.0.0.1",
+        port,
+        method,
+        path: requestPath,
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            statusCode: res.statusCode,
+            headers: res.headers,
+            body: Buffer.concat(chunks),
+          });
+        });
+      }
+    );
+
+    req.on("error", reject);
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
+
+async function waitForServer(port, retries = 50) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await request({ port, method: "GET", path: "/health" });
+      if (response.statusCode === 200 && response.body.toString() === "ok") {
+        return;
+      }
+    } catch {
+      // 服务器尚未就绪，继续重试
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error("预览服务器未能在预期时间内启动");
+}
+
+async function testPreviewServer() {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const projectRoot = path.resolve(__dirname, "..");
+  const port = await getFreePort();
+
+  const server = spawn(process.execPath, [path.join(projectRoot, "preview-server.js")], {
+    cwd: projectRoot,
+    env: { ...process.env, PORT: String(port) },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stderr = "";
+  server.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+
+  try {
+    await waitForServer(port);
+
+    const page = await request({ port, method: "GET", path: "/" });
+    assert.strictEqual(page.statusCode, 200);
+    assert.match(page.body.toString("utf8"), /<form method="POST" action="\/generate">/);
+
+    const formBody = new URLSearchParams({
+      title: "预览测试",
+      recipient: "测试单位",
+      body: "第一段\n第二段",
+    }).toString();
+
+    const generated = await request({
+      port,
+      method: "POST",
+      path: "/generate",
+      body: formBody,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(formBody),
+      },
+    });
+
+    assert.strictEqual(generated.statusCode, 200, stderr || "预览接口应返回 200");
+    assert.match(
+      generated.headers["content-type"],
+      /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/
+    );
+    assert.strictEqual(generated.body[0], 0x50, "下载文件应以 PK 开头");
+    assert.strictEqual(generated.body[1], 0x4B, "下载文件应以 PK 开头");
+
+    console.log("✓ Preview 服务器测试通过");
+  } finally {
+    server.kill("SIGTERM");
+    await new Promise((resolve) => server.once("exit", resolve));
+  }
+}
+
 // ============================================================
 // 运行所有测试
 // ============================================================
@@ -116,6 +236,7 @@ try {
   testNumberingManager();
   await testBuilder();
   await testCreateDocument();
+  await testPreviewServer();
   console.log("\n✅ 所有测试通过！");
 } catch (err) {
   console.error("\n❌ 测试失败:", err.message);
