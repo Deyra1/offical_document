@@ -350,6 +350,8 @@ class OfficialDocumentBuilder {
                 right: MARGIN.right,
               },
             },
+            titlePage: false,
+            evenAndOddHeaderAndFooters: this.options.showPageNumber,
           },
           headers: this.options.showPageNumber
             ? undefined
@@ -359,10 +361,48 @@ class OfficialDocumentBuilder {
                 default: new Footer({
                   children: [
                     new Paragraph({
-                      alignment: AlignmentType.CENTER,
+                      alignment: AlignmentType.RIGHT,
+                      spacing: { before: 200 }, // 上距版心下边缘约7mm
+                      indent: { right: 320 }, // 右空一字
                       children: [
                         new TextRun({
+                          text: "— ",
+                          font: { eastAsia: FONT.songti },
+                          size: FONT_SIZE["宋体_4号半角"],
+                        }),
+                        new TextRun({
                           children: [PageNumber.CURRENT],
+                          font: { eastAsia: FONT.songti },
+                          size: FONT_SIZE["宋体_4号半角"],
+                        }),
+                        new TextRun({
+                          text: " —",
+                          font: { eastAsia: FONT.songti },
+                          size: FONT_SIZE["宋体_4号半角"],
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+                even: new Footer({
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.LEFT,
+                      spacing: { before: 200 },
+                      indent: { left: 320 }, // 左空一字
+                      children: [
+                        new TextRun({
+                          text: "— ",
+                          font: { eastAsia: FONT.songti },
+                          size: FONT_SIZE["宋体_4号半角"],
+                        }),
+                        new TextRun({
+                          children: [PageNumber.CURRENT],
+                          font: { eastAsia: FONT.songti },
+                          size: FONT_SIZE["宋体_4号半角"],
+                        }),
+                        new TextRun({
+                          text: " —",
                           font: { eastAsia: FONT.songti },
                           size: FONT_SIZE["宋体_4号半角"],
                         }),
